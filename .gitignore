@@ -1,0 +1,8 @@
+# Environment Variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Data (Optional - user only asked for env vars but pycache is standard)

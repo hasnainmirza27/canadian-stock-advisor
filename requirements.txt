@@ -1,0 +1,5 @@
+yfinance
+pandas
+snaptrade-python-sdk
+python-dotenv
+colorama
