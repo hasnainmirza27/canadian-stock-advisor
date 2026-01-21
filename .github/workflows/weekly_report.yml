@@ -1,0 +1,49 @@
+name: Weekly Stock Report
+
+on:
+  schedule:
+    # Runs at 21:00 UTC every Friday (5:00 PM ADT)
+    - cron: '0 21 * * 5'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Analysis
+        # Capture output to file, but also show in console
+        run: python main.py | tee report.txt
+        env:
+            # Pass any required API keys here if needed for yfinance/snaptrade
+            # Assuming yfinance works without keys for basic data
+            # SnapTrade keys are only needed if --trade arg is used, which we aren't using here.
+            SNAPTRADE_CLIENT_ID: ${{ secrets.SNAPTRADE_CLIENT_ID }}
+            SNAPTRADE_CONSUMER_KEY: ${{ secrets.SNAPTRADE_CONSUMER_KEY }}
+            SNAPTRADE_USER_ID: ${{ secrets.SNAPTRADE_USER_ID }}
+
+      - name: Send mail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: Weekly Canadian Stock Advisor Report
+          to: ${{ secrets.MAIL_RECIPIENT }}
+          from: Canadian Stock Advisor
+          body: file://report.txt
+          convert_markdown: true # Optional: if output is markdown

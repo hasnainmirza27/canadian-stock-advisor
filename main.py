@@ -18,7 +18,7 @@ load_dotenv()
 
 # Configuration
 STOCK_FILE = 'stocks.json'
-DEFAULT_STOCKS = ['RY.TO', 'TD.TO', 'SHOP.TO', 'CNQ.TO', 'BMO.TO', 'ENB.TO'] # Major Canadian stocks
+DEFAULT_STOCKS = ['TD.TO', 'CNQ.TO', 'CAR.UN', 'BMO.TO', 'REI-UN.TO', 'SRU-UN.TO', 'EIF.TO', 'GRT-UN.TO', 'NPI.TO', 'SIA.TO'] # Major Canadian stocks + Monthly Payers
 
 def get_snaptrade_client():
     client_id = os.getenv("SNAPTRADE_CLIENT_ID")
