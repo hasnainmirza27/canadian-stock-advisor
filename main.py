@@ -10,6 +10,9 @@ from colorama import init, Fore, Style
 import json
 
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime
 
 # Load environment variables from .env file (if present)
@@ -228,9 +231,124 @@ def analyze_stock(ticker, category="N/A"):
         print(f"Error analyzing {ticker}: {e}")
         return None
 
+def format_results_html(results):
+    """Generates a clean HTML table for the email report."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+    
+    html = f"""
+    <html>
+    <head>
+    <style>
+        table {{ border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }}
+        th, td {{ text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }}
+        th {{ background-color: #f2f2f2; font-weight: bold; }}
+        .buy {{ color: #28a745; font-weight: bold; }}
+        .sell {{ color: #dc3545; font-weight: bold; }}
+        .hold {{ color: #007bff; font-weight: bold; }}
+        .header {{ background-color: #333; color: white; padding: 20px; text-align: center; }}
+    </style>
+    </head>
+    <body>
+        <div class="header">
+            <h2>Canadian Stock Advisor Report</h2>
+            <p>Generated on {now_str}</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                    <th>Yield</th>
+                    <th>RSI</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    for res in results:
+        action = res['recommendation']
+        action_class = action.lower()
+        
+        html += f"""
+                <tr>
+                    <td>{res['ticker']}</td>
+                    <td>{res['category']}</td>
+                    <td>${res['price']:.2f}</td>
+                    <td class="{action_class}">{action}</td>
+                    <td>{res['div_yield']:.2f}%</td>
+                    <td>{res['rsi'] if res['rsi'] else 'N/A'}</td>
+                    <td>{res['reason']}</td>
+                </tr>
+        """
+    
+    html += """
+            </tbody>
+        </table>
+        <p style="color: #666; font-size: 12px; margin-top: 20px;">
+            This is an automated report from your Canadian Stock Advisor script.
+        </p>
+    </body>
+    </html>
+    """
+    return html
+
+def send_email_report(results, args):
+    """Sends the analysis results via SMTP."""
+    # Priority: Command Line > Environment Variables
+    to_email = args.to_email or os.getenv("SMTP_TO_EMAIL")
+    smtp_server = args.smtp_server or os.getenv("SMTP_SERVER")
+    smtp_port = args.smtp_port or os.getenv("SMTP_PORT")
+    smtp_user = args.smtp_user or os.getenv("SMTP_USER")
+    smtp_pass = args.smtp_pass or os.getenv("SMTP_PASS")
+
+    if not all([to_email, smtp_server, smtp_port, smtp_user, smtp_pass]):
+        print("\nMissing email configuration. Please provide CLI arguments or set .env variables.")
+        print("Required: --to-email, --smtp-server, --smtp-port, --smtp-user, --smtp-pass")
+        return
+
+    try:
+        print(f"Preparing email report for {to_email}...")
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Stock Advisor Report - {datetime.now().strftime('%Y-%m-%d')}"
+        msg["From"] = smtp_user
+        msg["To"] = to_email
+
+        html_content = format_results_html(results)
+        msg.attach(MIMEText(html_content, "html"))
+
+        # Convert port to int
+        port = int(smtp_port)
+
+        # Connection logic
+        if port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, port)
+        else:
+            server = smtplib.SMTP(smtp_server, port)
+            server.starttls()
+
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, to_email, msg.as_string())
+        server.quit()
+        print(f"{Fore.GREEN}Email sent successfully!{Style.RESET_ALL}")
+
+    except Exception as e:
+        print(f"{Fore.RED}Failed to send email: {e}{Style.RESET_ALL}")
+
 def main():
     parser = argparse.ArgumentParser(description='Canadian Stock Advisor')
     parser.add_argument('--trade', action='store_true', help='Execute trades using SnapTrade based on recommendations')
+    
+    # Email Arguments
+    parser.add_argument('--email', action='store_true', help='Send report via email')
+    parser.add_argument('--to-email', help='Recipient email address')
+    parser.add_argument('--smtp-server', help='SMTP server host')
+    parser.add_argument('--smtp-port', help='SMTP server port (e.g. 587 or 465)')
+    parser.add_argument('--smtp-user', help='SMTP username')
+    parser.add_argument('--smtp-pass', help='SMTP password or App Password')
+    
     args = parser.parse_args()
     
     # Initialize colorama
@@ -315,6 +433,11 @@ def main():
             print(f"{ticker:<8} {category:<15} {y_price:>10} {price:>10} {colored_action} {div_freq:<10} {div_yield:>8} {fcast_str:>12} {rsi_str:>8}   {reason}")
 
         print("="*165 + "\n")
+        
+        # Send Email Report if requested
+        if args.email:
+            send_email_report(new_results, args)
+
     else:
         print("No results generated.")
 
