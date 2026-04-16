@@ -18,7 +18,15 @@ load_dotenv()
 
 # Configuration
 STOCK_FILE = 'stocks.json'
-DEFAULT_STOCKS = ['TD.TO', 'CNQ.TO', 'CAR.UN', 'BMO.TO', 'REI-UN.TO', 'SRU-UN.TO', 'EIF.TO', 'GRT-UN.TO', 'NPI.TO', 'SIA.TO'] # Major Canadian stocks + Monthly Payers
+DEFAULT_STOCKS = [
+    {"ticker": "TD.TO", "category": "S&P/TSX 60"},
+    {"ticker": "CNQ.TO", "category": "S&P/TSX 60"},
+    {"ticker": "RY.TO", "category": "S&P/TSX 60"},
+    {"ticker": "SHOP.TO", "category": "S&P/TSX 60"},
+    {"ticker": "ENB.TO", "category": "S&P/TSX 60"},
+    {"ticker": "REI-UN.TO", "category": "REIT"},
+    {"ticker": "HIVE.V", "category": "Penny/Spec"}
+] # Primary balanced list for initializations
 
 def get_snaptrade_client():
     client_id = os.getenv("SNAPTRADE_CLIENT_ID")
@@ -134,7 +142,7 @@ def calculate_forecast(series, days_ahead=7):
     forecast_value = slope * (29 + days_ahead) + intercept
     return forecast_value
 
-def analyze_stock(ticker):
+def analyze_stock(ticker, category="N/A"):
     try:
         stock = yf.Ticker(ticker)
         # Fetch 1 year of data to calculate 200 SMA
@@ -179,6 +187,27 @@ def analyze_stock(ticker):
             if recommendation == "BUY": recommendation = "HOLD" # Overbought, might pull back
             reason.append(f"RSI Overbought ({rsi:.2f})")
 
+        # Dividend Info
+        info = stock.info
+        div_rate = info.get('dividendRate')
+        last_div = info.get('lastDividendValue')
+        div_yield = info.get('dividendYield') # This is usually expressed as a percentage in newer yfinance, e.g. 3.29
+        
+        # Fallback for yield if dividendYield is missing but rate is there
+        if div_yield is None and div_rate and current_price:
+            div_yield = (div_rate / current_price) * 100
+        
+        # Calculate Frequency
+        if div_rate and last_div and last_div > 0:
+            freq_num = round(div_rate / last_div)
+            if freq_num == 12: div_freq = "Monthly"
+            elif freq_num == 4: div_freq = "Quarterly"
+            elif freq_num == 2: div_freq = "Semi-Annl"
+            elif freq_num == 1: div_freq = "Annual"
+            else: div_freq = f"{freq_num}x/yr"
+        else:
+            div_freq = "N/A"
+
         return {
             "ticker": ticker,
             "date": datetime.now().isoformat(),
@@ -189,7 +218,10 @@ def analyze_stock(ticker):
             "sma_200": round(sma_200, 2) if pd.notna(sma_200) else None,
             "rsi": round(rsi, 2) if pd.notna(rsi) else None,
             "recommendation": recommendation,
-            "reason": "; ".join(reason)
+            "reason": "; ".join(reason),
+            "div_freq": div_freq,
+            "div_yield": round(div_yield, 2) if div_yield else 0.0,
+            "category": category
         }
 
     except Exception as e:
@@ -222,9 +254,16 @@ def main():
     new_results = []
     print(f"Analyzing {len(stocks)} stocks...")
     
-    for ticker in stocks:
-        # print(f"Processing {ticker}...") # Reduced noise
-        result = analyze_stock(ticker)
+    for stock_entry in stocks:
+        # Handle both old string format and new dict format for robustness
+        if isinstance(stock_entry, dict):
+            ticker = stock_entry['ticker']
+            category = stock_entry.get('category', 'N/A')
+        else:
+            ticker = stock_entry
+            category = "N/A"
+
+        result = analyze_stock(ticker, category)
         if result:
             new_results.append(result)
             
@@ -233,14 +272,15 @@ def main():
                 execute_trade(trade_client, trade_user_id, ticker, result['recommendation'])
 
 
-        print("\n" + "="*120)
+    if new_results:
+        print("\n" + "="*165)
         # Header with fixed widths
-        # Ticker(8) | Yesterday(10) | Price(10) | Forecast(14) | Action(8) | RSI(8) | Reason
-        header = f"{'Ticker':<8} {'Yesterday':>10} {'Price':>10} {'Forecast (14d)':>14} {'Action':^8} {'RSI':>8}   {'Reason'}"
+        # Ticker(8) | Category(15) | Yesterday(10) | Price(10) | Action(8) | Freq(10) | Yield(8) | Forecast(12) | RSI(8) | Reason
+        header = f"{'Ticker':<8} {'Category':<15} {'Yesterday':>10} {'Price':>10} {'Action':^8} {'Div Freq':<10} {'Yield':>8} {'Forecast':>12} {'RSI':>8}   {'Reason'}"
         print(f"Analysis Results - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        print("="*120)
+        print("="*165)
         print(header)
-        print("-" * 120)
+        print("-" * 165)
 
         for res in new_results:
             ticker = res['ticker']
@@ -266,11 +306,15 @@ def main():
             rsi_val = res.get('rsi')
             rsi_str = f"{rsi_val:.2f}" if rsi_val else "N/A"
             
+            div_freq = res.get('div_freq', 'N/A')
+            div_yield = f"{res.get('div_yield', 0.0):.2f}%"
+            
             reason = res.get('reason', '')
+            category = res.get('category', 'N/A')
 
-            print(f"{ticker:<8} {y_price:>10} {price:>10} {fcast_str:>14} {colored_action} {rsi_str:>8}   {reason}")
+            print(f"{ticker:<8} {category:<15} {y_price:>10} {price:>10} {colored_action} {div_freq:<10} {div_yield:>8} {fcast_str:>12} {rsi_str:>8}   {reason}")
 
-        print("="*120 + "\n")
+        print("="*165 + "\n")
     else:
         print("No results generated.")
 
