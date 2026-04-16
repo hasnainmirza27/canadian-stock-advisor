@@ -15,8 +15,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
-# Load environment variables from .env file (if present)
-load_dotenv()
+# Prioritize system environment variables (e.g., Git Secrets) over local .env file.
+# load_dotenv() will only load values from the .env file if the keys 
+# are not already present in the system environment.
+load_dotenv(override=False)
 
 
 # Configuration
@@ -32,9 +34,10 @@ DEFAULT_STOCKS = [
 ] # Primary balanced list for initializations
 
 def get_snaptrade_client():
-    client_id = os.getenv("SNAPTRADE_CLIENT_ID")
-    consumer_key = os.getenv("SNAPTRADE_CONSUMER_KEY")
-    user_id = os.getenv("SNAPTRADE_USER_ID")
+    # Priority: System Environment Variables (Git Secrets) > .env File
+    client_id = os.environ.get("SNAPTRADE_CLIENT_ID")
+    consumer_key = os.environ.get("SNAPTRADE_CONSUMER_KEY")
+    user_id = os.environ.get("SNAPTRADE_USER_ID")
     
     if not all([client_id, consumer_key, user_id]):
         print("Error: SNAPTRADE_CLIENT_ID, SNAPTRADE_CONSUMER_KEY, and SNAPTRADE_USER_ID must be set in environment variables.")
@@ -297,12 +300,12 @@ def format_results_html(results):
 
 def send_email_report(results, args):
     """Sends the analysis results via SMTP."""
-    # Priority: Command Line > Environment Variables
-    to_email = args.to_email or os.getenv("SMTP_TO_EMAIL")
-    smtp_server = args.smtp_server or os.getenv("SMTP_SERVER")
-    smtp_port = args.smtp_port or os.getenv("SMTP_PORT")
-    smtp_user = args.smtp_user or os.getenv("SMTP_USER")
-    smtp_pass = args.smtp_pass or os.getenv("SMTP_PASS")
+    # Priority: Command Line > System Environment Variables (Git Secrets) > .env File
+    to_email = args.to_email or os.environ.get("SMTP_TO_EMAIL")
+    smtp_server = args.smtp_server or os.environ.get("SMTP_SERVER")
+    smtp_port = args.smtp_port or os.environ.get("SMTP_PORT")
+    smtp_user = args.smtp_user or os.environ.get("SMTP_USER")
+    smtp_pass = args.smtp_pass or os.environ.get("SMTP_PASS")
 
     if not all([to_email, smtp_server, smtp_port, smtp_user, smtp_pass]):
         print("\nMissing email configuration. Please provide CLI arguments or set .env variables.")

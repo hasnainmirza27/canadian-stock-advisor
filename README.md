@@ -70,15 +70,13 @@ To have this run automatically (e.g., daily at 6 PM):
 ## Automated Trading (SnapTrade)
 This script supports automated trading via [SnapTrade](https://snaptrade.com/).
 
-### Setup
-1.  Obtain your `CLIENT_ID`, `CONSUMER_KEY`, and `USER_ID` from SnapTrade.
-2.  Create a `.env` file in the project folder (use `.env.example` as a template).
-3.  Add your credentials to `.env`:
-    ```ini
-    SNAPTRADE_CLIENT_ID=your_client_id
-    SNAPTRADE_CONSUMER_KEY=your_consumer_key
-    SNAPTRADE_USER_ID=your_user_id
-    ```
+### Configuration Hierarchy
+The script follows a specific hierarchy when loading configuration parameters (SnapTrade credentials, SMTP settings):
+1.  **Command Line Arguments** (Highest priority - e.g., `--to-email`)
+2.  **System Environment Variables** (Git Secrets, Runner Variables, Shell Exports)
+3.  **`.env` File** (Lowest priority - used as a local fallback)
+
+This hierarchy ensures that sensitive credentials stored in Git Secrets or environment variables are always prioritized over a local `.env` file.
 
 ### Usage
 To enable trading, add the `--trade` flag:
