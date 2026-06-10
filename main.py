@@ -388,16 +388,18 @@ def main():
         if result:
             new_results.append(result)
             
-            # Execute Trade if enabled and Client valid
             if args.trade and trade_client and result['recommendation'] in ['BUY', 'SELL']:
                 execute_trade(trade_client, trade_user_id, ticker, result['recommendation'])
 
+    # Sort results by recommendation: BUY first, then HOLD, then SELL
+    rec_order = {"BUY": 0, "HOLD": 1, "SELL": 2}
+    new_results.sort(key=lambda x: rec_order.get(x.get('recommendation', 'HOLD'), 3))
 
     if new_results:
         print("\n" + "="*165)
         # Header with fixed widths
-        # Ticker(8) | Category(15) | Yesterday(10) | Price(10) | Action(8) | Freq(10) | Yield(8) | Forecast(12) | RSI(8) | Reason
-        header = f"{'Ticker':<8} {'Category':<15} {'Yesterday':>10} {'Price':>10} {'Action':^8} {'Div Freq':<10} {'Yield':>8} {'Forecast':>12} {'RSI':>8}   {'Reason'}"
+        # Ticker(8) | Category(15) | Yesterday(10) | Price(10) | Forecast(12) | Action(8) | Freq(10) | Yield(8) | RSI(8) | Reason
+        header = f"{'Ticker':<8} {'Category':<15} {'Yesterday':>10} {'Price':>10} {'Forecast':>12} {'Action':^8} {'Div Freq':<10} {'Yield':>8} {'RSI':>8}   {'Reason'}"
         print(f"Analysis Results - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         print("="*165)
         print(header)
@@ -433,7 +435,7 @@ def main():
             reason = res.get('reason', '')
             category = res.get('category', 'N/A')
 
-            print(f"{ticker:<8} {category:<15} {y_price:>10} {price:>10} {colored_action} {div_freq:<10} {div_yield:>8} {fcast_str:>12} {rsi_str:>8}   {reason}")
+            print(f"{ticker:<8} {category:<15} {y_price:>10} {price:>10} {fcast_str:>12} {colored_action} {div_freq:<10} {div_yield:>8} {rsi_str:>8}   {reason}")
 
         print("="*165 + "\n")
         
